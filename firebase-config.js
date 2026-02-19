@@ -1,9 +1,9 @@
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuratie - vervang met je eigen config
 const firebaseConfig = {
   apiKey: "AIzaSyAt-n2A_3FH9rY-XtsdfuHTgjtJQHIxqAY",
   authDomain: "epsteinunited.firebaseapp.com",
-  projectId: "epsteinunited",
-  storageBucket: "epsteinunited.firebasestorage.app",
+  projectId: "epstein-united", // <-- STREEPJE TERUGGEPLAATST!
+  storageBucket: "epsteinunited.appspot.com",
   messagingSenderId: "603988196357",
   appId: "1:603988196357:web:203e9451d880aafe63b06c",
   measurementId: "G-BBSLNQFGH8"
