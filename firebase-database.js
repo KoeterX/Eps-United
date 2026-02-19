@@ -118,31 +118,35 @@ class DatabaseManager {
         }
     }
 
-    // Statistieken bijwerken
-    async updateStatistics() {
-        try {
-            const registrations = await this.getAllRegistrations();
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            
-            const newMembers = registrations.filter(reg => 
-                reg.timestamp && reg.timestamp.toDate && reg.timestamp.toDate() > thirtyDaysAgo
-            ).length;
-            
-            const stats = {
-                totalMembers: 247 + registrations.length,
-                activeParticipants: 189 + Math.floor(registrations.length * 0.8),
-                newMembers: 23 + newMembers,
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            };
-            
-            await this.db.collection(this.statisticsCollection).doc('current').set(stats);
-            return stats;
-        } catch (error) {
-            console.error('Error updating statistics:', error);
-            return null;
-        }
+// Statistieken bijwerken
+async updateStatistics() {
+    try {
+        const registrations = await this.getAllRegistrations();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const newMembers = registrations.filter(reg => {
+            if (!reg.timestamp) return false;
+            const timestamp = reg.timestamp.toDate ? reg.timestamp.toDate() : new Date(reg.timestamp);
+            return timestamp > thirtyDaysAgo;
+        }).length;
+        
+        const stats = {
+            totalMembers: 247 + registrations.length,
+            activeParticipants: 189 + Math.floor(registrations.length * 0.8),
+            newMembers: 23 + newMembers,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Schrijf statistieken zonder te wachten op updateStatistics
+        await this.db.collection(this.statisticsCollection).doc('current').set(stats);
+        
+        return stats;
+    } catch (error) {
+        console.error('Error updating statistics:', error);
+        return null;
     }
+}
 
     // Real-time listener voor statistieken
     onStatisticsUpdate(callback) {
