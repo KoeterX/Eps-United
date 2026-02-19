@@ -126,7 +126,7 @@ class DatabaseManager {
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             
             const newMembers = registrations.filter(reg => 
-                reg.timestamp && reg.timestamp.toDate() > thirtyDaysAgo
+                reg.timestamp && reg.timestamp.toDate && reg.timestamp.toDate() > thirtyDaysAgo
             ).length;
             
             const stats = {
