@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Submit registration
+            // Simulate form submission
             submitRegistration(data);
         });
     }
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(el);
     });
     
-    // Initialize participants list and statistics
+    // Update participants list dynamically
     updateParticipantsList();
     
     // Add hover effects to cards
@@ -376,7 +376,7 @@ function loadFromLocalStorage() {
     // Sort by timestamp (newest first)
     registrations.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
-    // Add last 4 registrations to list
+    // Add last 4 registrations to the list
     registrations.slice(0, 4).forEach(registration => {
         addParticipantToList(registration);
     });
