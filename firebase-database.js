@@ -1,4 +1,4 @@
-// Firebase Database Operations voor Epstein United - Firebase v12
+// Firebase Database Operations voor Epstein United
 
 class DatabaseManager {
     constructor() {
@@ -10,11 +10,9 @@ class DatabaseManager {
     // Nieuwe registratie toevoegen
     async addRegistration(registrationData) {
         try {
-            import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            
-            const docRef = await addDoc(collection(this.db, this.registrationsCollection), {
+            const docRef = await this.db.collection(this.registrationsCollection).add({
                 ...registrationData,
-                timestamp: serverTimestamp(),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 createdAt: new Date().toISOString(),
                 status: 'active'
             });
@@ -40,10 +38,10 @@ class DatabaseManager {
     // Alle registraties ophalen
     async getAllRegistrations() {
         try {
-            import { collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            
-            const q = query(collection(this.db, this.registrationsCollection), orderBy('timestamp', 'desc'));
-            const snapshot = await getDocs(q);
+            const snapshot = await this.db
+                .collection(this.registrationsCollection)
+                .orderBy('timestamp', 'desc')
+                .get();
             
             return snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -58,14 +56,11 @@ class DatabaseManager {
     // Recente registraties ophalen (laatste 10)
     async getRecentRegistrations(limit = 10) {
         try {
-            import { collection, getDocs, orderBy, query, limit as limitFn } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            
-            const q = query(
-                collection(this.db, this.registrationsCollection), 
-                orderBy('timestamp', 'desc'),
-                limitFn(limit)
-            );
-            const snapshot = await getDocs(q);
+            const snapshot = await this.db
+                .collection(this.registrationsCollection)
+                .orderBy('timestamp', 'desc')
+                .limit(limit)
+                .get();
             
             return snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -79,43 +74,38 @@ class DatabaseManager {
 
     // Real-time listener voor registraties
     onRegistrationsUpdate(callback) {
-        import { collection, orderBy, query, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-        
-        const q = query(
-            collection(this.db, this.registrationsCollection), 
-            orderBy('timestamp', 'desc')
-        );
-        
-        return onSnapshot(q, (snapshot) => {
-            const registrations = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            callback(registrations);
-        }, (error) => {
-            console.error('Real-time listener error:', error);
-        });
+        return this.db
+            .collection(this.registrationsCollection)
+            .orderBy('timestamp', 'desc')
+            .limit(10)
+            .onSnapshot((snapshot) => {
+                const registrations = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                callback(registrations);
+            }, (error) => {
+                console.error('Real-time listener error:', error);
+            });
     }
 
     // Statistieken ophalen
     async getStatistics() {
         try {
-            import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            const docRef = this.db.collection(this.statisticsCollection).doc('current');
+            const doc = await docRef.get();
             
-            const docRef = doc(this.db, this.statisticsCollection, 'current');
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists()) {
-                return docSnap.data();
+            if (doc.exists) {
+                return doc.data();
             } else {
                 // Initieel statistieken document aanmaken
                 const initialStats = {
                     totalMembers: 247,
                     activeParticipants: 189,
                     newMembers: 23,
-                    lastUpdated: serverTimestamp()
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 };
-                await setDoc(docRef, initialStats);
+                await docRef.set(initialStats);
                 return initialStats;
             }
         } catch (error) {
@@ -131,26 +121,22 @@ class DatabaseManager {
     // Statistieken bijwerken
     async updateStatistics() {
         try {
-            import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            
             const registrations = await this.getAllRegistrations();
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             
-            const newMembers = registrations.filter(reg => {
-                if (!reg.timestamp) return false;
-                const timestamp = reg.timestamp.toDate ? reg.timestamp.toDate() : new Date(reg.timestamp);
-                return timestamp > thirtyDaysAgo;
-            }).length;
+            const newMembers = registrations.filter(reg => 
+                reg.timestamp && reg.timestamp.toDate() > thirtyDaysAgo
+            ).length;
             
             const stats = {
                 totalMembers: 247 + registrations.length,
                 activeParticipants: 189 + Math.floor(registrations.length * 0.8),
                 newMembers: 23 + newMembers,
-                lastUpdated: serverTimestamp()
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             };
             
-            await setDoc(doc(this.db, this.statisticsCollection, 'current'), stats);
+            await this.db.collection(this.statisticsCollection).doc('current').set(stats);
             return stats;
         } catch (error) {
             console.error('Error updating statistics:', error);
@@ -160,22 +146,20 @@ class DatabaseManager {
 
     // Real-time listener voor statistieken
     onStatisticsUpdate(callback) {
-        import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-        
-        const docRef = doc(this.db, this.statisticsCollection, 'current');
-        return onSnapshot(docRef, (doc) => {
-            if (doc.exists()) {
-                callback(doc.data());
-            }
-        });
+        return this.db
+            .collection(this.statisticsCollection)
+            .doc('current')
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    callback(doc.data());
+                }
+            });
     }
 
     // Registratie verwijderen (admin functie)
     async deleteRegistration(registrationId) {
         try {
-            import { doc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            
-            await deleteDoc(doc(this.db, this.registrationsCollection, registrationId));
+            await this.db.collection(this.registrationsCollection).doc(registrationId).delete();
             await this.updateStatistics();
             return { success: true, message: 'Registratie verwijderd' };
         } catch (error) {
@@ -187,11 +171,9 @@ class DatabaseManager {
     // Registratie bijwerken
     async updateRegistration(registrationId, updateData) {
         try {
-            import { doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
-            
-            await updateDoc(doc(this.db, this.registrationsCollection, registrationId), {
+            await this.db.collection(this.registrationsCollection).doc(registrationId).update({
                 ...updateData,
-                lastModified: serverTimestamp()
+                lastModified: firebase.firestore.FieldValue.serverTimestamp()
             });
             return { success: true, message: 'Registratie bijgewerkt' };
         } catch (error) {
@@ -203,11 +185,11 @@ class DatabaseManager {
     // Zoeken in registraties
     async searchRegistrations(searchTerm) {
         try {
-            import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            const snapshot = await this.db
+                .collection(this.registrationsCollection)
+                .get();
             
-            const snapshot = await getDocs(collection(this.db, this.registrationsCollection));
-            
-            return snapshot.docs.map(doc => ({
+            const results = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             })).filter(reg => 
@@ -215,6 +197,8 @@ class DatabaseManager {
                 reg.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 reg.activity.toLowerCase().includes(searchTerm.toLowerCase())
             );
+            
+            return results;
         } catch (error) {
             console.error('Error searching registrations:', error);
             return [];
