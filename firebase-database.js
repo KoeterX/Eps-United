@@ -1,4 +1,4 @@
-// Firebase Database Operations voor Epstein United
+// Firebase Database Operations voor Epstein United - Firebase v12
 
 class DatabaseManager {
     constructor() {
@@ -10,9 +10,11 @@ class DatabaseManager {
     // Nieuwe registratie toevoegen
     async addRegistration(registrationData) {
         try {
-            const docRef = await this.db.collection(this.registrationsCollection).add({
+            import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            
+            const docRef = await addDoc(collection(this.db, this.registrationsCollection), {
                 ...registrationData,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                timestamp: serverTimestamp(),
                 createdAt: new Date().toISOString(),
                 status: 'active'
             });
@@ -38,10 +40,10 @@ class DatabaseManager {
     // Alle registraties ophalen
     async getAllRegistrations() {
         try {
-            const snapshot = await this.db
-                .collection(this.registrationsCollection)
-                .orderBy('timestamp', 'desc')
-                .get();
+            import { collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            
+            const q = query(collection(this.db, this.registrationsCollection), orderBy('timestamp', 'desc'));
+            const snapshot = await getDocs(q);
             
             return snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -56,11 +58,14 @@ class DatabaseManager {
     // Recente registraties ophalen (laatste 10)
     async getRecentRegistrations(limit = 10) {
         try {
-            const snapshot = await this.db
-                .collection(this.registrationsCollection)
-                .orderBy('timestamp', 'desc')
-                .limit(limit)
-                .get();
+            import { collection, getDocs, orderBy, query, limit as limitFn } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            
+            const q = query(
+                collection(this.db, this.registrationsCollection), 
+                orderBy('timestamp', 'desc'),
+                limitFn(limit)
+            );
+            const snapshot = await getDocs(q);
             
             return snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -74,38 +79,43 @@ class DatabaseManager {
 
     // Real-time listener voor registraties
     onRegistrationsUpdate(callback) {
-        return this.db
-            .collection(this.registrationsCollection)
-            .orderBy('timestamp', 'desc')
-            .limit(10)
-            .onSnapshot((snapshot) => {
-                const registrations = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                callback(registrations);
-            }, (error) => {
-                console.error('Real-time listener error:', error);
-            });
+        import { collection, orderBy, query, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+        
+        const q = query(
+            collection(this.db, this.registrationsCollection), 
+            orderBy('timestamp', 'desc')
+        );
+        
+        return onSnapshot(q, (snapshot) => {
+            const registrations = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            callback(registrations);
+        }, (error) => {
+            console.error('Real-time listener error:', error);
+        });
     }
 
     // Statistieken ophalen
     async getStatistics() {
         try {
-            const docRef = this.db.collection(this.statisticsCollection).doc('current');
-            const doc = await docRef.get();
+            import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
             
-            if (doc.exists) {
-                return doc.data();
+            const docRef = doc(this.db, this.statisticsCollection, 'current');
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                return docSnap.data();
             } else {
                 // Initieel statistieken document aanmaken
                 const initialStats = {
                     totalMembers: 247,
                     activeParticipants: 189,
                     newMembers: 23,
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    lastUpdated: serverTimestamp()
                 };
-                await docRef.set(initialStats);
+                await setDoc(docRef, initialStats);
                 return initialStats;
             }
         } catch (error) {
@@ -118,52 +128,54 @@ class DatabaseManager {
         }
     }
 
-// Statistieken bijwerken
-async updateStatistics() {
-    try {
-        const registrations = await this.getAllRegistrations();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const newMembers = registrations.filter(reg => {
-            if (!reg.timestamp) return false;
-            const timestamp = reg.timestamp.toDate ? reg.timestamp.toDate() : new Date(reg.timestamp);
-            return timestamp > thirtyDaysAgo;
-        }).length;
-        
-        const stats = {
-            totalMembers: 247 + registrations.length,
-            activeParticipants: 189 + Math.floor(registrations.length * 0.8),
-            newMembers: 23 + newMembers,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        // Schrijf statistieken zonder te wachten op updateStatistics
-        await this.db.collection(this.statisticsCollection).doc('current').set(stats);
-        
-        return stats;
-    } catch (error) {
-        console.error('Error updating statistics:', error);
-        return null;
+    // Statistieken bijwerken
+    async updateStatistics() {
+        try {
+            import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            
+            const registrations = await this.getAllRegistrations();
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const newMembers = registrations.filter(reg => {
+                if (!reg.timestamp) return false;
+                const timestamp = reg.timestamp.toDate ? reg.timestamp.toDate() : new Date(reg.timestamp);
+                return timestamp > thirtyDaysAgo;
+            }).length;
+            
+            const stats = {
+                totalMembers: 247 + registrations.length,
+                activeParticipants: 189 + Math.floor(registrations.length * 0.8),
+                newMembers: 23 + newMembers,
+                lastUpdated: serverTimestamp()
+            };
+            
+            await setDoc(doc(this.db, this.statisticsCollection, 'current'), stats);
+            return stats;
+        } catch (error) {
+            console.error('Error updating statistics:', error);
+            return null;
+        }
     }
-}
 
     // Real-time listener voor statistieken
     onStatisticsUpdate(callback) {
-        return this.db
-            .collection(this.statisticsCollection)
-            .doc('current')
-            .onSnapshot((doc) => {
-                if (doc.exists) {
-                    callback(doc.data());
-                }
-            });
+        import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+        
+        const docRef = doc(this.db, this.statisticsCollection, 'current');
+        return onSnapshot(docRef, (doc) => {
+            if (doc.exists()) {
+                callback(doc.data());
+            }
+        });
     }
 
     // Registratie verwijderen (admin functie)
     async deleteRegistration(registrationId) {
         try {
-            await this.db.collection(this.registrationsCollection).doc(registrationId).delete();
+            import { doc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            
+            await deleteDoc(doc(this.db, this.registrationsCollection, registrationId));
             await this.updateStatistics();
             return { success: true, message: 'Registratie verwijderd' };
         } catch (error) {
@@ -175,9 +187,11 @@ async updateStatistics() {
     // Registratie bijwerken
     async updateRegistration(registrationId, updateData) {
         try {
-            await this.db.collection(this.registrationsCollection).doc(registrationId).update({
+            import { doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+            
+            await updateDoc(doc(this.db, this.registrationsCollection, registrationId), {
                 ...updateData,
-                lastModified: firebase.firestore.FieldValue.serverTimestamp()
+                lastModified: serverTimestamp()
             });
             return { success: true, message: 'Registratie bijgewerkt' };
         } catch (error) {
@@ -189,11 +203,11 @@ async updateStatistics() {
     // Zoeken in registraties
     async searchRegistrations(searchTerm) {
         try {
-            const snapshot = await this.db
-                .collection(this.registrationsCollection)
-                .get();
+            import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
             
-            const results = snapshot.docs.map(doc => ({
+            const snapshot = await getDocs(collection(this.db, this.registrationsCollection));
+            
+            return snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             })).filter(reg => 
@@ -201,8 +215,6 @@ async updateStatistics() {
                 reg.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 reg.activity.toLowerCase().includes(searchTerm.toLowerCase())
             );
-            
-            return results;
         } catch (error) {
             console.error('Error searching registrations:', error);
             return [];
