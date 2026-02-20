@@ -503,34 +503,6 @@ footer {
     color: #999;
 }
 
-/* Notifications */
-.notification {
-    position: fixed;
-    top: 100px;
-    right: 20px;
-    padding: 15px 20px;
-    border-radius: 8px;
-    color: white;
-    font-weight: 500;
-    z-index: 10000;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    max-width: 300px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-.notification-success {
-    background: linear-gradient(135deg, #4CAF50, #45a049);
-}
-
-.notification-error {
-    background: linear-gradient(135deg, #f44336, #da190b);
-}
-
-.notification-info {
-    background: linear-gradient(135deg, #2196F3, #0b7dda);
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
     .hamburger {
